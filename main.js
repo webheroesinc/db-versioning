@@ -156,6 +156,15 @@ async function main ( argv ) {
 	    case 'version':
 		print("Current version is %s", currentVersion);
 		break;
+	    case 'update':
+		version				= args[0];
+
+		if ( ! await prompter.confirm("Are you sure you want to update the current version to "+version+"?") )
+		    break;
+
+		await config.setVersion( version );
+		print("Version is now set to %s", await config.currentVersion());
+		break;
 	    case 'uninstall':
 		try {
 		    await config.uninstall();
@@ -210,7 +219,9 @@ async function main ( argv ) {
 
 				print("Successfully upgraded to version %-8.8s (%s)", pack.version.name, pack.name);
 
-				await config.packComplete( pack, 'upgrade', pack.version.name );
+				if ( config.packComplete )
+				    await config.packComplete( pack, 'upgrade', pack.version.name );
+				await config.setVersion( pack.version.name );
 			    } catch (err) {
 				console.log( err );
 				log.fatal("Upgrade failed, running downgrade to rollback changes");
@@ -265,7 +276,11 @@ async function main ( argv ) {
 			    let newVersion	= vpacks[i-1]
 				? vpacks[i-1].version.name
 				: version;
-			    await config.packComplete( pack, 'downgrade', newVersion );
+
+			    if ( config.packComplete )
+				await config.packComplete( pack, 'downgrade', newVersion );
+
+			    await config.setVersion( newVersion );
 			}
 			
 		    }
@@ -293,6 +308,13 @@ async function main ( argv ) {
 	.description("Get the database current version")
 	.action(async function () {
 	    await runCommand('version', [], this, this.parent);
+	});
+
+    commander
+	.command('update <version>')
+	.description("Update current version to given version")
+	.action(async function ( version ) {
+	    await runCommand('update', [ version ], this, this.parent);
 	});
 
     commander
