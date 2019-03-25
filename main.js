@@ -32,7 +32,7 @@ async function loadConfig( configFile = './dbv-config.js' ) {
     contextID					= await config.contextID();
     log.debug("Aquired context: %s", typeof context );
 }
-    
+
 async function exit(n) {
     log.debug("Finished, running config.teardown");
     config.teardown();
@@ -61,7 +61,7 @@ function getVersionPacks( startVersion, endVersion ) {
 
 		    if ( compareVersions( v, startVersion ) !== 1 ||
 			 compareVersions( v, endVersion ) === 1 ) {
-			log.debug('Skipping version %s (%s) because is outside range %s-%s', v, name, startVersion, endVersion);
+			log.debug("Skipping version %-8.8s (%s) because is outside range %s-%s", v, name, startVersion, endVersion);
 			return;
 		    }
 		    
@@ -78,7 +78,7 @@ function getVersionPacks( startVersion, endVersion ) {
 		    });
 		    
 		} catch (err) {
-		    log.error('Failed to load vpack: %s', err);
+		    log.error("Failed to load vpack: %s", err);
 		    console.error( err );
 		}
 	    });
@@ -102,7 +102,8 @@ async function main ( argv ) {
     async function runCommand(command, args, cmdopts, opts) {
 	// Set logging verbosity for console transport
 	log.transports[0].setLevel( opts.verbose );
-	print("Log level set to %d:%s", opts.verbose || 0, log.transports[0].level);
+	if ( process.env.DEBUG_LEVEL )
+	    print("Log level set to %d:%s", opts.verbose || 0, log.transports[0].level);
 
 	await loadConfig( opts.config );
 	print("Using context %s", contextID);
@@ -122,9 +123,14 @@ async function main ( argv ) {
 	}
 	
 	log.debug("Running subcommand %s", command);
-	let vpacks, version, currentVersion;
+	let vpacks, version,
+	    currentVersion			= await getCurrentVersion();
 	try {
 	    switch( command ) {
+	    case 'version':
+		print("Current version is %s", currentVersion);
+		return;
+		break;
 	    case 'install':
 		await config.install();
 		break;
@@ -135,9 +141,22 @@ async function main ( argv ) {
 		dryRun				= cmdopts.dryRun;
 		version				= args[0];
 		currentVersion			= await getCurrentVersion();
+
+		if ( compareVersions( currentVersion, version ) !== -1 ) {
+		    print("Unable to upgrade. Current version (%s) is not lower than given version (%s)", currentVersion, version);
+		    break;
+		}
+
 		vpacks				= await getVersionPacks( currentVersion, version );
 
-		if ( !dryRun )
+		print("Preview list of packages that will or will NOT run (packs: %d):", vpacks.length);
+		for (var i=0; i < vpacks.length; i++ ) {
+		    let pack			= vpacks[i];
+		    let passed			= await pack.module.check.call( pack, context );
+		    print("  - %12.12s upgrade for package %-8.8s (%s)", !passed ? 'Will run' : 'Will NOT run', pack.version.name, pack.name );
+		}
+
+		if ( !(dryRun || cmdopts.yes) )
 		    if ( ! await prompter.confirm("Proceed with upgrade for context " + contextID + "?", "n") )
 			break;
 
@@ -150,18 +169,29 @@ async function main ( argv ) {
 			if ( dryRun )
 			    print("Would have run upgrade for version %-8.8s (%s)", pack.version.name, pack.name);
 			else {
-			    await pack.module.upgrade.call( pack, context );
-			    passed		= await pack.module.check.call( pack, context );
-			    if ( !passed )
-				throw new Error("Failed to install properly");
-			    
-			    await config.packComplete( pack, 'upgrade', pack.version.name );
+			    try {
+				log.info("Running upgrade %s", pack.version.name);
+				await pack.module.upgrade.call( pack, context );
+
+				passed		= await pack.module.check.call( pack, context );
+				if ( !passed ) {
+				    print("    Failed to upgrade to version %-8.8s (%s)", pack.version.name, pack.name)
+				    throw new Error("Failed to pass pack.check().  Either your upgrade is incomplete or your check is misconfigured.");
+				}
+
+				print("Successfully upgraded to version %-8.8s (%s)", pack.version.name, pack.name);
+
+				await config.packComplete( pack, 'upgrade', pack.version.name );
+			    } catch (err) {
+				console.log( err );
+				log.fatal("Upgrade failed, running downgrade to rollback changes");
+				await pack.module.downgrade.call( pack, context );
+			    }
 			}
 			
 		    }
 		}
-		
-		log.silly( JSON.stringify( vpacks, null, 4 ) );
+		print("Version is now set to %s", await config.currentVersion());
 		break;
 	    case 'downgrade':
 		dryRun				= cmdopts.dryRun;
@@ -169,7 +199,19 @@ async function main ( argv ) {
 		currentVersion			= await getCurrentVersion();
 		vpacks				= await getVersionPacks( version, currentVersion );
 
-		if ( !dryRun )
+		if ( compareVersions( currentVersion, version ) !== 1 ) {
+		    print("Unable to downgrade. Current version (%s) is not higher than given version (%s)", currentVersion, version);
+		    break;
+		}
+
+		print("Preview list of packages that will or will NOT run (packs: %d):", vpacks.length);
+		for (var i=vpacks.length-1; i >= 0; i-- ) {
+		    let pack			= vpacks[i];
+		    let passed			= await pack.module.check.call( pack, context );
+		    print("  - %12.12s downgrade for package %-8.8s (%s)", passed ? 'Will run' : 'Will NOT run', pack.version.name, pack.name );
+		}
+
+		if ( !(dryRun || cmdopts.yes) )
 		    if ( ! await prompter.confirm("Proceed with downgrade for context " + contextID + "?", "n") )
 			break;
 
@@ -184,8 +226,12 @@ async function main ( argv ) {
 			else {
 			    await pack.module.downgrade.call( pack, context );
 			    passed		= await pack.module.check.call( pack, context );
-			    if ( passed )
-				throw new Error("Failed to uninstall properly");
+			    if ( passed ) {
+				print("    Failed to downgrade version %-8.8s (%s)", pack.version.name, pack.name)
+				throw new Error("Failed to pass pack.check().  Either your downgrade is incomplete or your check is misconfigured.");
+			    }
+
+			    print("Successfully downgraded version %-8.8s (%s)", pack.version.name, pack.name);
 
 			    let newVersion	= vpacks[i-1]
 				? vpacks[i-1].version.name
@@ -195,10 +241,10 @@ async function main ( argv ) {
 			
 		    }
 		}
-		
-		log.silly( JSON.stringify( vpacks, null, 4 ) );
+		print("Version is now set to %s", await config.currentVersion());
 		break;
 	    }
+	    log.silly( JSON.stringify( vpacks, null, 4 ) );
 	} catch (err) {
 	    console.error( err );
 	    exit( 1 );
@@ -213,6 +259,13 @@ async function main ( argv ) {
 	.option('-c, --config [path]', 'Configuration file for database connection', addRelative)
 	.option('-o, --override [version]', 'Manually override the current version');
     
+    commander
+	.command('version')
+	.description("Get the database current version")
+	.action(async function () {
+	    await runCommand('version', [], this, this.parent);
+	});
+
     commander
 	.command('install')
 	.description("Install version tracking requirements.  Calls 'config.install'")
@@ -230,6 +283,7 @@ async function main ( argv ) {
     commander
 	.command('upgrade <version>')
 	.option('-n, --dry-run', 'See which versions would have been run')
+	.option('-y, --yes', 'Answer yes to all prompts')
 	.description("Run upgrade scripts between current version and given version")
 	.action(async function ( version ) {
 	    await runCommand('upgrade', [ version ], this, this.parent);
@@ -238,6 +292,7 @@ async function main ( argv ) {
     commander
 	.command('downgrade <version>')
 	.option('-n, --dry-run', 'See which versions would have been run')
+	.option('-y, --yes', 'Answer yes to all prompts')
 	.description("Run downgrade scripts between current version and given version")
 	.action(async function ( version ) {
 	    await runCommand('downgrade', [ version ], this, this.parent);
