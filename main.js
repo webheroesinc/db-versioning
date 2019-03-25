@@ -108,6 +108,14 @@ async function main ( argv ) {
 	await loadConfig( opts.config );
 	print("Using context %s", contextID);
 
+	if ( command !== 'install' ) {
+	    log.debug("Check installed");
+	    if ( ! await config.isInstalled() ) {
+		print("dbv is not installed.  Must run 'dbv install' first.");
+		exit( 1 );
+	    }
+	}
+
 	async function getCurrentVersion() {
 	    let cv;
 	    
