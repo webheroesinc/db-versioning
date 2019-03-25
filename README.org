@@ -1,0 +1,32 @@
+
+* Overview
+  
+  A database agnostic version control framework with deterministic state detection.
+
+** How does it work?
+
+   ~./revisions~ directory.  Files are sorted by a timestamp
+
+*** Immutable update files
+
+    The contents of an update file should be hashed and (manually) saved.  When doing a rollback,
+    the hash can be compared to verify that the update file is indeed the same as when the update
+    was executed.
+
+
+*** The database context
+    
+    To remain completely agnostic, the database connection should be defined in the initial
+    configuration and passed to each method as the the context.  There will be no assumptions about
+    the database and no API for interacting with database objects.
+
+
+*** Detect version
+
+*** 
+
+*** Database table design
+    
+    - Version
+    - Activity log
+    - 

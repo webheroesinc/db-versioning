@@ -1,0 +1,29 @@
+{
+  "name": "db-versioning",
+  "version": "0.1.0",
+  "description": "An agnostic database versioning tool designed for predictable upgrading/downgrading of database schema and content",
+  "main": "main.js",
+  "scripts": {
+    "test": "make tests"
+  },
+  "keywords": [
+    "database",
+    "versioning",
+    "db",
+    "db-version",
+    "version-manager"
+  ],
+  "bin": {
+    "dbv": "./main.js"
+  },
+  "author": "Matthew Brisebois",
+  "license": "ISC",
+  "dependencies": {
+    "@whi/printjs": "file:../../src/printjs",
+    "@whi/prompter": "file:../../src/prompter",
+    "@whi/stdlog": "file:../../src/stdlog",
+    "async-wait-until": "^1.2.4",
+    "commander": "^2.19.0",
+    "compare-versions": "^3.4.0"
+  }
+}
