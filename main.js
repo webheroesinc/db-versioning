@@ -129,7 +129,6 @@ async function main ( argv ) {
 	    switch( command ) {
 	    case 'version':
 		print("Current version is %s", currentVersion);
-		return;
 		break;
 	    case 'install':
 		await config.install();
@@ -250,7 +249,7 @@ async function main ( argv ) {
 	    exit( 1 );
 	}
 	
-	exit();
+	exit( 0 );
     }
     
     commander
