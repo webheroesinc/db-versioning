@@ -187,6 +187,11 @@ async function main ( argv ) {
 
 		vpacks				= await getVersionPacks( currentVersion, version );
 
+		if ( vpacks.length === 0 ) {
+		    print("No packages between versions %s-%s.  Exiting with nothing to do", currentVersion, version);
+		    exit( 0 );
+		}
+
 		print("Preview list of packages that will or will NOT run (packs: %d):", vpacks.length);
 		for (var i=0; i < vpacks.length; i++ ) {
 		    let pack			= vpacks[i];
@@ -237,11 +242,17 @@ async function main ( argv ) {
 		dryRun				= cmdopts.dryRun;
 		version				= args[0];
 		currentVersion			= await getCurrentVersion();
-		vpacks				= await getVersionPacks( version, currentVersion );
 
 		if ( compareVersions( currentVersion, version ) !== 1 ) {
 		    print("Unable to downgrade. Current version (%s) is not higher than given version (%s)", currentVersion, version);
 		    break;
+		}
+
+		vpacks				= await getVersionPacks( version, currentVersion );
+
+		if ( vpacks.length === 0 ) {
+		    print("No packages between versions %s-%s.  Exiting with nothing to do", version, currentVersion );
+		    exit( 0 );
 		}
 
 		print("Preview list of packages that will or will NOT run (packs: %d):", vpacks.length);
