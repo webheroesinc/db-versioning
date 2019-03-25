@@ -31,6 +31,8 @@ async function loadConfig( configFile = './dbv-config.js' ) {
     context					= await config.context();
     contextID					= await config.contextID();
     log.debug("Aquired context: %s", typeof context );
+
+    return configFile;
 }
 
 async function exit(n) {
@@ -105,15 +107,31 @@ async function main ( argv ) {
 	if ( process.env.DEBUG_LEVEL )
 	    print("Log level set to %d:%s", opts.verbose || 0, log.transports[0].level);
 
-	await loadConfig( opts.config );
+	const configPath			= await loadConfig( opts.config );
 	print("Using context %s", contextID);
 
+	// Handle install differently than other commands
 	if ( command !== 'install' ) {
 	    log.debug("Check installed");
 	    if ( ! await config.isInstalled() ) {
 		print("dbv is not installed.  Must run 'dbv install' first.");
 		exit( 1 );
 	    }
+	} else {
+	    try {
+		if ( await config.isInstalled() ) {
+		    print("dbv is already installed");
+		    exit( 0 );
+		}
+		
+		await config.install();
+		print("Successfully installed dbv requirements based on config '%s'", configPath);
+	    } catch (err) {
+		console.log( err );
+		print("Failed to install dbv using config '%s'", configPath);
+		exit( 2 );
+	    }
+	    exit( 0 );
 	}
 
 	async function getCurrentVersion() {
@@ -138,11 +156,15 @@ async function main ( argv ) {
 	    case 'version':
 		print("Current version is %s", currentVersion);
 		break;
-	    case 'install':
-		await config.install();
-		break;
 	    case 'uninstall':
-		await config.uninstall();
+		try {
+		    await config.uninstall();
+		    print("Successfully uninstalled dbv requirements based on config '%s'", configPath);
+		} catch (err) {
+		    console.log( err );
+		    print("Failed to uninstall dbv using config '%s'", configPath);
+		    exit( 2 );
+		}
 		break;
 	    case 'upgrade':
 		dryRun				= cmdopts.dryRun;
