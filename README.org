@@ -1,3 +1,15 @@
+#+SETUPFILE: https://mjbrisebois.github.io/org-html-themes/setup/theme-readtheorg.setup
+
+#+TITLE: Database Version Management (dbv)
+#+SUBTITLE: Command line tool for safely running migration scripts
+#+DESCRIPTION: Command line tool for safely running migration scripts
+
+#+AUTHOR: Matthew Brisebois
+#+EMAIL: matthew@webheroes.ca
+
+#+HTML_LINK_HOME: ./index.html
+#+HTML_LINK_UP: ./index.html
+
 
 * Overview
   
@@ -6,6 +18,21 @@
 ** How does it work?
 
    ~./revisions~ directory.  Files are sorted by a timestamp
+
+** Rules / Guidelines
+
+   Inspired by [[https://odetocode.com/blogs/scott/archive/2008/02/02/versioning-databases-change-scripts.aspx][K. Scott Allen - Versioning databases: change scripts]]
+
+   1. Database migration must be tracked with source control.  This will ensure that developers
+      properly merge and resolve conflicting database migrations before updating the production
+      branch.
+   2. Once a script is published into the master (production) branch, it cannot be changed!  Someone
+      who is running a production version of the database must never have to uninstall an update.
+   3. Shared databases must have shared version tracking.  The responsibility of updating the
+      version should reside with the tool that applies the updates.
+   4. Always backup a production database before applying a change script. If a change script
+      happens to fail with an error, you can at least get the database back into a known state.
+   5. Every upgrade should have validation tests to confirm it's success.
 
 *** Immutable update files
 
@@ -20,13 +47,78 @@
     configuration and passed to each method as the the context.  There will be no assumptions about
     the database and no API for interacting with database objects.
 
+    #+begin_src toml
+    [adapters]
+    default = "@dbv/mssql-adapter"
+    #+end_src
 
-*** Detect version
+*** Detect version or centralized version tracking
 
-*** 
+**** Schema change log table
 
 *** Database table design
     
     - Version
     - Activity log
     - 
+
+** Recommended structure
+
+*** Dedicated Source Control
+
+    Separate source control for database scripts so that commits and branches don't get mixed up
+    with implementation.
+  
+    : project/.git
+    : project-database/.git
+  
+    This will also enable you to use your existing source control system instead of learning a new
+    one specifically for databases, such as ~klonio~ (intended to be a git for databases).
+
+*** Local build vs shared build
+
+    
+* API Reference
+
+** Migration file naming syntax
+   
+   : <major>.<minor>.<patch>-<name [dashes become spaces]>.js
+
+   Example:
+   : 1.0.0-build.js
+
+** Version package object
+
+   Example:
+   #+begin_src javascript
+   {
+       name: "build",
+       path: "./versions/1.0.0-build.js",
+       version: {
+           name: "1.0.0",
+           major: 1,
+           minor: 0,
+           patch: 0,
+       },
+       module: require( './versions/1.0.0-build.js' ),
+   }
+   #+end_src
+
+** Adapter
+*** ~<function> context~
+*** ~<function> contextID~
+*** ~<function> teardown~
+*** ~<function> currentVersion~
+*** ~<function> setVersion~
+*** ~<function> isInstalled~
+*** ~<function> install~
+*** ~<function> uninstall~
+
+** Version script
+   ~this~ context will always be the version package object.
+
+*** ~check( ctx )~
+*** ~upgrade( ctx )~
+*** ~downgrade( ctx )~
+*** ~validation( ctx, action )~
+    
