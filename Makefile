@@ -14,7 +14,7 @@ test:			node_modules
 # NPM Package
 #
 clean-files:
-	git clean -fdX -e 'node_modules'
+	git clean -fdx -e 'node_modules'
 preview-package:	clean-files test
 	npm pack --dry-run .
 create-package:		clean-files test

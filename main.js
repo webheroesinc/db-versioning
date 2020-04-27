@@ -1,15 +1,17 @@
 #!/usr/bin/env node
+// -*- mode: javascript -*-
 
 const path					= require('path');
 const log					= require('@whi/stdlog')(path.basename( __filename ), {
-    level: process.env.DEBUG_LEVEL || 'silly',
+    level: process.env.DEBUG_LEVEL || 'fatal',
 });
-const print					= require('@whi/printf').colorAlways();
-const prompter					= require('@whi/prompter');
 
 const fs					= require('fs');
 const compareVersions				= require('compare-versions');
 const commander					= require('commander');
+
+const print					= require('@whi/printf').colorAlways();
+const prompter					= require('@whi/prompter');
 
 process.on('unhandledRejection', (reason, p) => {
     console.error( reason, p );
@@ -59,16 +61,20 @@ function getVersionPacks( startVersion, endVersion ) {
 		    let [ v, ...name ]		= file.split('-');
 		    let module			= require( cwd + '/versions/' + file );
 		    let version			= v.split('.').map( n => parseInt(n) );
-		    name			= name.join(' ').slice(0,-3);
+		    name			= name.join(' ').slice(0,-3); // remove '.js'
 
-		    if ( compareVersions( v, startVersion ) !== 1 ||
-			 compareVersions( v, endVersion ) === 1 ) {
+		    if ( ( startVersion				!== undefined	&&
+			   endVersion				!== undefined )
+			 &&
+			 ( compareVersions( v, startVersion )	!== 1		||
+			   compareVersions( v, endVersion )	=== 1 )) {
 			log.debug("Skipping version %-8.8s (%s) because is outside range %s-%s", v, name, startVersion, endVersion);
 			return;
 		    }
 		    
 		    vpacks.push({
 			name,
+			description: module.description || null,
 			path: cwd + '/versions/' + file,
 			version: {
 			    name: v,
@@ -109,6 +115,8 @@ async function main ( argv ) {
 
 	const configPath			= await loadConfig( opts.config );
 	print("Using context %s", contextID);
+
+	await config.isInstalled();
 
 	// Handle install differently than other commands
 	if ( command !== 'install' ) {
@@ -155,6 +163,18 @@ async function main ( argv ) {
 	    switch( command ) {
 	    case 'version':
 		print("Current version is %s", currentVersion);
+		break;
+	    case 'list':
+		vpacks				= await getVersionPacks();
+		
+		print("Migration package list:");
+		for (var i=0; i < vpacks.length; i++ ) {
+		    let pack			= vpacks[i];
+		    print("  %-8.8s %s", pack.version.name, pack.name );
+		    if ( typeof pack.description === 'string' )
+			print("%-12.12s - %s", "",  pack.description );
+		}
+		
 		break;
 	    case 'update':
 		version				= args[0];
@@ -319,6 +339,13 @@ async function main ( argv ) {
 	.description("Get the database current version")
 	.action(async function () {
 	    await runCommand('version', [], this, this.parent);
+	});
+    
+    commander
+	.command('list')
+	.description("List available migration scripts")
+	.action(async function () {
+	    await runCommand('list', [], this, this.parent);
 	});
 
     commander
