@@ -1,6 +1,6 @@
 {
   "name": "@whi/dbv",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "An agnostic database versioning tool designed for predictable upgrading/downgrading of database schema and content",
   "main": "main.js",
   "scripts": {},
