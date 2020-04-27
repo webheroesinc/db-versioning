@@ -1,4 +1,4 @@
-/node_modules
-/package-lock.json
-/config.js
-*~
+node_modules
+config.js
+tests.sqlite
+main.log

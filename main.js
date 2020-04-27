@@ -5,16 +5,17 @@ const path					= require('path');
 const log					= require('@whi/stdlog')(path.basename( __filename ), {
     level: process.env.DEBUG_LEVEL || 'fatal',
 });
+
 const fs					= require('fs');
 const compareVersions				= require('compare-versions');
 const commander					= require('commander');
 
-const print					= require('@whi/printjs').colorAlways();
+const print					= require('@whi/printf').colorAlways();
 const prompter					= require('@whi/prompter');
 
 process.on('unhandledRejection', (reason, p) => {
+    console.error( reason, p );
     log.fatal('Unhandled Rejection at Promise %s for reason: %s', p, reason);
-    console.error( p );
     process.exit(1);
 });
 
@@ -318,7 +319,7 @@ async function main ( argv ) {
 		print("Version is now set to %s", await config.currentVersion());
 		break;
 	    }
-	    log.silly( JSON.stringify( vpacks, null, 4 ) );
+	    log.silly("%s", JSON.stringify( vpacks, null, 4 ) );
 	} catch (err) {
 	    console.error( err );
 	    exit( 1 );
